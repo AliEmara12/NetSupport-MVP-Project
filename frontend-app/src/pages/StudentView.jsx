@@ -15,7 +15,7 @@ const StudentView = () => {
     const [timeLeft, setTimeLeft] = useState(null);
     const [isFinished, setIsFinished] = useState(false);
 
-    // ✅ Restore session on mount
+    // Restore session on mount
     useEffect(() => {
         const savedSession = sessionStorage.getItem('studentSession');
         if (savedSession) {
@@ -34,7 +34,7 @@ const StudentView = () => {
         }
     }, []);
 
-    // ✅ Persist session on every relevant state change
+    // Persist session on every relevant state change
     useEffect(() => {
         if (student) {
             sessionStorage.setItem('studentSession', JSON.stringify({
@@ -42,6 +42,48 @@ const StudentView = () => {
             }));
         }
     }, [student, examId, questions, selectedAnswers, endTime, isFinished, isLocked]);
+
+    // ✅ SignalR: listen to real-time exam control events
+    useEffect(() => {
+        if (!student) return;
+
+        const handleLockCommand = (locked) => setIsLocked(locked);
+
+        const handleTestStarted = async (eId, durationInMinutes) => {
+            setExamId(eId);
+            const calculatedEndTime = Date.now() + (durationInMinutes * 60000);
+            setEndTime(calculatedEndTime);
+            setIsFinished(false);
+            setSelectedAnswers({});
+            setCurrentQuestionIndex(0);
+            // fetchQuestions will be added in the next commit
+        };
+
+        const handleSyncTime = async (eId, syncEndTime) => {
+            setExamId(eId);
+            setEndTime(syncEndTime);
+            setIsFinished(false);
+            setSelectedAnswers({});
+            setCurrentQuestionIndex(0);
+            // fetchQuestions will be added in the next commit
+        };
+
+        const handleForceStop = () => {
+            setIsFinished(true);
+        };
+
+        signalRService.on('ReceiveLockCommand', handleLockCommand);
+        signalRService.on('TestStarted', handleTestStarted);
+        signalRService.on('SyncExamTime', handleSyncTime);
+        signalRService.on('ReceiveForceStop', handleForceStop);
+
+        return () => {
+            signalRService.off('ReceiveLockCommand', handleLockCommand);
+            signalRService.off('TestStarted', handleTestStarted);
+            signalRService.off('SyncExamTime', handleSyncTime);
+            signalRService.off('ReceiveForceStop', handleForceStop);
+        };
+    }, [student]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -64,6 +106,18 @@ const StudentView = () => {
         sessionStorage.removeItem('studentSession');
         window.location.reload();
     };
+
+    if (isLocked) {
+        return (
+            <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center">
+                <svg className="w-24 h-24 text-red-500 mb-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7z" />
+                </svg>
+                <h1 className="text-4xl font-bold text-white tracking-widest uppercase">Screen Locked</h1>
+                <p className="text-slate-400 mt-4">Tutor has paused your session.</p>
+            </div>
+        );
+    }
 
     if (!student) {
         return (
@@ -102,9 +156,7 @@ const StudentView = () => {
                 Connected as {student.name}{' '}
                 <span className="text-blue-500 text-sm">#{student.id}</span>
             </p>
-            <button onClick={handleLeave} className="mt-4 bg-slate-800 text-white px-6 py-2 rounded-lg">
-                Leave
-            </button>
+            <p className="text-slate-400 mt-2">Waiting for the tutor to start the exam...</p>
         </div>
     );
 };
