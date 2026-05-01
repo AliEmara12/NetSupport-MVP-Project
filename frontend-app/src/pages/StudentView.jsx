@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StudentService } from '../services/api';
 import signalRService from '../services/signalr';
 
@@ -14,6 +14,34 @@ const StudentView = () => {
     const [endTime, setEndTime] = useState(null);
     const [timeLeft, setTimeLeft] = useState(null);
     const [isFinished, setIsFinished] = useState(false);
+
+    // ✅ Restore session on mount
+    useEffect(() => {
+        const savedSession = sessionStorage.getItem('studentSession');
+        if (savedSession) {
+            const parsed = JSON.parse(savedSession);
+            setStudent(parsed.student);
+            setExamId(parsed.examId);
+            setQuestions(parsed.questions || []);
+            setSelectedAnswers(parsed.selectedAnswers || {});
+            setEndTime(parsed.endTime);
+            setIsFinished(parsed.isFinished || false);
+            setIsLocked(parsed.isLocked || false);
+
+            if (parsed.student) {
+                signalRService.startConnection(parsed.student.id, parsed.student.name, 'eval');
+            }
+        }
+    }, []);
+
+    // ✅ Persist session on every relevant state change
+    useEffect(() => {
+        if (student) {
+            sessionStorage.setItem('studentSession', JSON.stringify({
+                student, examId, questions, selectedAnswers, endTime, isFinished, isLocked
+            }));
+        }
+    }, [student, examId, questions, selectedAnswers, endTime, isFinished, isLocked]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
