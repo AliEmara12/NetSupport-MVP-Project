@@ -43,7 +43,7 @@ const StudentView = () => {
         }
     }, [student, examId, questions, selectedAnswers, endTime, isFinished, isLocked]);
 
-    // ✅ SignalR: listen to real-time exam control events
+    // SignalR: listen to real-time exam control events
     useEffect(() => {
         if (!student) return;
 
@@ -56,7 +56,7 @@ const StudentView = () => {
             setIsFinished(false);
             setSelectedAnswers({});
             setCurrentQuestionIndex(0);
-            // fetchQuestions will be added in the next commit
+            fetchQuestions(eId);
         };
 
         const handleSyncTime = async (eId, syncEndTime) => {
@@ -65,7 +65,7 @@ const StudentView = () => {
             setIsFinished(false);
             setSelectedAnswers({});
             setCurrentQuestionIndex(0);
-            // fetchQuestions will be added in the next commit
+            fetchQuestions(eId);
         };
 
         const handleForceStop = () => {
@@ -84,6 +84,45 @@ const StudentView = () => {
             signalRService.off('ReceiveForceStop', handleForceStop);
         };
     }, [student]);
+
+    // Fetch questions from API and shuffle answers
+    const fetchQuestions = async (eId) => {
+        try {
+            const response = await StudentService.getExam(eId);
+            const shuffledQuestions = response.data.map(q => ({
+                ...q,
+                answers: [...q.answers].sort(() => Math.random() - 0.5)
+            }));
+            setQuestions(shuffledQuestions);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    // ✅ Countdown timer — auto-submits when time runs out
+    useEffect(() => {
+        if (!endTime || isFinished) return;
+
+        const timerId = setInterval(() => {
+            const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+            setTimeLeft(remaining);
+
+            if (remaining === 0) {
+                setIsFinished(true);
+                clearInterval(timerId);
+            }
+        }, 1000);
+
+        return () => clearInterval(timerId);
+    }, [endTime, isFinished]);
+
+    // ✅ Format seconds → MM:SS display
+    const formatTime = (seconds) => {
+        if (seconds === null) return "--:--";
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -150,13 +189,44 @@ const StudentView = () => {
         );
     }
 
+    if (isFinished) {
+        return (
+            <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+                <div className="bg-white p-10 rounded-2xl shadow-2xl text-center max-w-lg w-full border-t-8 border-emerald-500">
+                    <div className="bg-emerald-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-12 h-12 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h2 className="text-3xl font-black text-slate-800 mb-2">Exam Submitted!</h2>
+                    <p className="text-slate-500 text-lg font-medium mb-8">Your answers have been securely saved.</p>
+                    <button onClick={handleLeave} className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-8 rounded-lg transition shadow-md">
+                        Leave Classroom
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
-            <p className="text-slate-600 font-bold text-lg">
-                Connected as {student.name}{' '}
-                <span className="text-blue-500 text-sm">#{student.id}</span>
-            </p>
-            <p className="text-slate-400 mt-2">Waiting for the tutor to start the exam...</p>
+            <div className="bg-white p-10 rounded-xl shadow-lg text-center flex flex-col items-center">
+                <svg className="w-10 h-10 text-blue-500 animate-spin mb-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="text-slate-600 font-bold text-lg">
+                    Connected as {student.name}{' '}
+                    <span className="text-blue-500 text-sm">#{student.id}</span>
+                </p>
+                <p className="text-slate-400 mt-2">Waiting for the tutor to start the exam...</p>
+                {/* Timer preview — will display once exam starts */}
+                {timeLeft !== null && (
+                    <div className={`mt-4 text-2xl font-black px-4 py-1.5 rounded-lg border-2 ${timeLeft < 60 ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                        ⏱ {formatTime(timeLeft)}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
