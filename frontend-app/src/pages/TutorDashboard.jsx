@@ -258,8 +258,8 @@ const TutorDashboard = () => {
                 <span className="bg-emerald-500 px-3 py-1 rounded-full text-sm font-semibold shadow-lg">● Tutor Online</span>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md border border-slate-200">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-lg shadow-md border border-slate-200">
                     <div className="flex justify-between items-center border-b pb-3 mb-4">
                         <h2 className="text-xl font-bold text-slate-700">Classroom Status</h2>
                         {students.length > 0 && (
